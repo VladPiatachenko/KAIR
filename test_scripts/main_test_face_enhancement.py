@@ -142,17 +142,17 @@ class faceenhancer_with_detection_alignment(object):
 
 if __name__=='__main__':
 
-    inputdir = os.path.join('testsets', 'real_faces')
-    outdir = os.path.join('testsets', 'real_faces_results')
+    inputdir = os.path.join('../testsets', 'real_faces')
+    outdir = os.path.join('../testsets', 'real_faces_results')
     os.makedirs(outdir, exist_ok=True)
 
     # whether use the face detection&alignment or not
     need_face_detection = True
 
     if need_face_detection:
-        enhancer = faceenhancer_with_detection_alignment(model_path=os.path.join('model_zoo','GPEN-BFR-512.pth'), size=512, channel_multiplier=2)
+        enhancer = faceenhancer_with_detection_alignment(model_path=os.path.join('../model_zoo', 'GPEN-BFR-512.pth'), size=512, channel_multiplier=2)
     else:
-        enhancer = faceenhancer(model_path=os.path.join('model_zoo','GPEN-BFR-512.pth'), size=512, channel_multiplier=2)
+        enhancer = faceenhancer(model_path=os.path.join('../model_zoo', 'GPEN-BFR-512.pth'), size=512, channel_multiplier=2)
 
     for idx, img_file in enumerate(util.get_image_paths(inputdir)):
         img_name, ext = os.path.splitext(os.path.basename(img_file))

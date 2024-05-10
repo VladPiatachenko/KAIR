@@ -4,7 +4,7 @@
   , "gpu_ids": [0]
 
   , "scale": 1       // broadcast to "netG" if SISR
-  , "n_channels": 1  // broadcast to "datasets", 1 for grayscale, 3 for color
+  , "n_channels": 3  // broadcast to "datasets", 1 for grayscale, 3 for color
 
   , "merge_bn": true               // BN for DnCNN
   , "merge_bn_startpoint": 400000  // merge BN after N iterations
@@ -18,8 +18,8 @@
     "train": {
       "name": "train_dataset"           // just name
       , "dataset_type": "dncnn"         // "dncnn" | "dnpatch" for dncnn,  | "fdncnn" | "ffdnet" | "sr" | "srmd" | "dpsr" | "plain" | "plainpatch"
-      , "dataroot_H": "trainsets/trainH"// path of H training dataset
-      , "dataroot_L": null              // path of L training dataset
+      , "dataroot_H": "trainsets/trainL"// path now refers to noicy training dataset
+      , "dataroot_L": "trainsets/trainH"// path now refers to clean training dataset
       , "H_size": 40                    // patch size 40 | 64 | 96 | 128 | 192
 
       , "sigma": 25                     // 15, 25, 50 for DnCNN | [0, 75] for FFDNet and FDnCNN
@@ -32,7 +32,7 @@
     , "test": {
       "name": "test_dataset"            // just name
       , "dataset_type": "dncnn"         // "dncnn" | "dnpatch" for dncnn,  | "fdncnn" | "ffdnet" | "sr" | "srmd" | "dpsr" | "plain" | "plainpatch"
-      , "dataroot_H": "testsets/bsd68"  // path of H testing dataset
+      , "dataroot_H": "trainsets/trainL"  // path of H testing dataset
       , "dataroot_L": null              // path of L testing dataset
 
       , "sigma": 25                     // 15, 25, 50 for DnCNN | [0, 75] for FFDNet and FDnCNN
@@ -43,8 +43,8 @@
 
   , "netG": {
     "net_type": "dncnn" // "dncnn" | "fdncnn" | "ffdnet" | "srmd" | "dpsr" | "msrresnet0" |  "msrresnet1" | "rrdb" 
-    , "in_nc": 1        // input channel number
-    , "out_nc": 1       // ouput channel number
+    , "in_nc": 3        // input channel number
+    , "out_nc": 3       // ouput channel number
     , "nc": 64          // 64 for "dncnn"
     , "nb": 17          // 17 for "dncnn", 20 for dncnn3, 16 for "srresnet"
     , "gc": 32          // unused
@@ -74,8 +74,8 @@
     , "G_regularizer_orthstep": null    // unused
     , "G_regularizer_clipstep": null    // unused
 
-    , "checkpoint_test": 5000           // for testing
-    , "checkpoint_save": 5000           // for saving model
-    , "checkpoint_print": 200           // for print
+    , "checkpoint_test": 100           // for testing
+    , "checkpoint_save": 5           // for saving model
+    , "checkpoint_print": 300           // for print
   }
 }

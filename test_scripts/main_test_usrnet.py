@@ -85,7 +85,7 @@ def main():
     # load testing kernels
     # ----------------------------------------
     # kernels = hdf5storage.loadmat(os.path.join('kernels', 'kernels.mat'))['kernels']
-    kernels = loadmat(os.path.join('kernels', 'kernels_12.mat'))['kernels']
+    kernels = loadmat(os.path.join('../kernels', 'kernels_12.mat'))['kernels']
 
     n_channels = 1 if 'gray' in  model_name else 3  # 3 for color image, 1 for grayscale image
     model_pool = 'model_zoo'  # fixed

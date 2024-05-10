@@ -15,20 +15,21 @@ from os import path as osp
 from collections import OrderedDict
 from torch.utils.data import DataLoader
 
-from models.network_rvrt import RVRT as net
+from models.network_vrt import VRT as net
 from utils import utils_image as util
-from data.dataset_video_test import VideoRecurrentTestDataset, VideoTestVimeo90KDataset, SingleVideoRecurrentTestDataset
+from data.dataset_video_test import VideoRecurrentTestDataset, VideoTestVimeo90KDataset, \
+    SingleVideoRecurrentTestDataset, VFI_DAVIS, VFI_UCF101, VFI_Vid4
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default='001_RVRT_videosr_bi_REDS_30frames', help='tasks: 001 to 006')
+    parser.add_argument('--task', type=str, default='001_VRT_videosr_bi_REDS_6frames', help='tasks: 001 to 008')
     parser.add_argument('--sigma', type=int, default=0, help='noise level for denoising: 10, 20, 30, 40, 50')
     parser.add_argument('--folder_lq', type=str, default='testsets/REDS4/sharp_bicubic',
                         help='input low-quality test video folder')
     parser.add_argument('--folder_gt', type=str, default=None,
                         help='input ground-truth test video folder')
-    parser.add_argument('--tile', type=int, nargs='+', default=[100,128,128],
+    parser.add_argument('--tile', type=int, nargs='+', default=[40,128,128],
                         help='Tile size, [0,0,0] for no tile during testing (testing as a whole)')
     parser.add_argument('--tile_overlap', type=int, nargs='+', default=[2,20,20],
                         help='Overlapping of different tiles')
@@ -42,9 +43,22 @@ def main():
     model.eval()
     model = model.to(device)
     if 'vimeo' in args.folder_lq.lower():
-        test_set = VideoTestVimeo90KDataset({'dataroot_gt':args.folder_gt, 'dataroot_lq':args.folder_lq,
-                                           'meta_info_file': "data/meta_info/meta_info_Vimeo90K_test_GT.txt",
-                                            'mirror_sequence': True, 'num_frame': 7, 'cache_data': False})
+        if 'videofi' in args.task:
+            test_set = VideoTestVimeo90KDataset({'dataroot_gt':args.folder_gt, 'dataroot_lq':args.folder_gt,
+                                               'meta_info_file': "data/meta_info/meta_info_Vimeo90K_test_GT.txt",
+                                                'pad_sequence': False, 'num_frame': 7, 'temporal_scale': 2,
+                                                 'cache_data': False})
+        else:
+            test_set = VideoTestVimeo90KDataset({'dataroot_gt': args.folder_gt, 'dataroot_lq': args.folder_lq,
+                                                 'meta_info_file': "data/meta_info/meta_info_Vimeo90K_test_GT.txt",
+                                                 'pad_sequence': True, 'num_frame': 7, 'temporal_scale': 1,
+                                                 'cache_data': False})
+    elif 'davis' in args.folder_lq.lower() and 'videofi' in args.task:
+        test_set = VFI_DAVIS(data_root=args.folder_gt)
+    elif 'ucf101' in args.folder_lq.lower() and 'videofi' in args.task:
+        test_set = VFI_UCF101(data_root=args.folder_gt)
+    elif 'vid4' in args.folder_lq.lower() and 'videofi' in args.task:
+        test_set = VFI_Vid4(data_root=args.folder_gt)
     elif args.folder_gt is not None:
         test_set = VideoRecurrentTestDataset({'dataroot_gt':args.folder_gt, 'dataroot_lq':args.folder_lq,
                                               'sigma':args.sigma, 'num_frame':-1, 'cache_data': False})
@@ -74,8 +88,11 @@ def main():
         with torch.no_grad():
             output = test_video(lq, model, args)
 
-        if 'vimeo' in args.folder_lq.lower():
-            output = (output[:, 3:4, :, :, :] + output[:, 10:11, :, :, :]) / 2
+        if 'videofi' in args.task:
+            output = output[:, :1, ...]
+            batch['lq_path'] = batch['gt_path']
+        elif 'videosr' in args.task and 'vimeo' in args.folder_lq.lower():
+            output = output[:, 3:4, :, :, :]
             batch['lq_path'] = batch['gt_path']
 
         test_results_folder = OrderedDict()
@@ -142,63 +159,86 @@ def prepare_model_dataset(args):
     ''' prepare model and dataset according to args.task. '''
 
     # define model
-    if args.task == '001_RVRT_videosr_bi_REDS_30frames':
-        model = net(upscale=4, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[144, 144, 144], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 1, 1, 1, 1, 1], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
+    if args.task == '001_VRT_videosr_bi_REDS_6frames':
+        model = net(upscale=4, img_size=[6,64,64], window_size=[6,8,8], depths=[8,8,8,8,8,8,8, 4,4,4,4, 4,4],
+                    indep_reconsts=[11,12], embed_dims=[120,120,120,120,120,120,120, 180,180,180,180, 180,180],
+                    num_heads=[6,6,6,6,6,6,6, 6,6,6,6, 6,6], pa_frames=2, deformable_groups=12)
         datasets = ['REDS4']
         args.scale = 4
-        args.window_size = [2,8,8]
+        args.window_size = [6,8,8]
         args.nonblind_denoising = False
 
-    elif args.task in ['002_RVRT_videosr_bi_Vimeo_14frames', '003_RVRT_videosr_bd_Vimeo_14frames']:
-        model = net(upscale=4, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[144, 144, 144], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 1, 1, 1, 1, 1], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
+    elif args.task == '002_VRT_videosr_bi_REDS_16frames':
+        model = net(upscale=4, img_size=[16,64,64], window_size=[8,8,8], depths=[8,8,8,8,8,8,8, 4,4,4,4, 4,4],
+                    indep_reconsts=[11,12], embed_dims=[120,120,120,120,120,120,120, 180,180,180,180, 180,180],
+                    num_heads=[6,6,6,6,6,6,6, 6,6,6,6, 6,6], pa_frames=6, deformable_groups=24)
+        datasets = ['REDS4']
+        args.scale = 4
+        args.window_size = [8,8,8]
+        args.nonblind_denoising = False
+
+    elif args.task in ['003_VRT_videosr_bi_Vimeo_7frames', '004_VRT_videosr_bd_Vimeo_7frames']:
+        model = net(upscale=4, img_size=[8,64,64], window_size=[8,8,8], depths=[8,8,8,8,8,8,8, 4,4,4,4, 4,4],
+                    indep_reconsts=[11,12], embed_dims=[120,120,120,120,120,120,120, 180,180,180,180, 180,180],
+                    num_heads=[6,6,6,6,6,6,6, 6,6,6,6, 6,6], pa_frames=4, deformable_groups=16)
         datasets = ['Vid4'] # 'Vimeo'. Vimeo dataset is too large. Please refer to #training to download it.
         args.scale = 4
-        args.window_size = [2,8,8]
+        args.window_size = [8,8,8]
         args.nonblind_denoising = False
 
-    elif args.task in ['004_RVRT_videodeblurring_DVD_16frames']:
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 3, 3, 3, 3], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
+    elif args.task in ['005_VRT_videodeblurring_DVD']:
+        model = net(upscale=1, img_size=[6,192,192], window_size=[6,8,8], depths=[8,8,8,8,8,8,8, 4,4, 4,4],
+                    indep_reconsts=[9,10], embed_dims=[96,96,96,96,96,96,96, 120,120, 120,120],
+                    num_heads=[6,6,6,6,6,6,6, 6,6, 6,6], pa_frames=2, deformable_groups=16)
         datasets = ['DVD10']
         args.scale = 1
-        args.window_size = [2,8,8]
+        args.window_size = [6,8,8]
         args.nonblind_denoising = False
 
-    elif args.task in ['005_RVRT_videodeblurring_GoPro_16frames']:
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 3, 3, 3, 3], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
+    elif args.task in ['006_VRT_videodeblurring_GoPro']:
+        model = net(upscale=1, img_size=[6,192,192], window_size=[6,8,8], depths=[8,8,8,8,8,8,8, 4,4, 4,4],
+                    indep_reconsts=[9,10], embed_dims=[96,96,96,96,96,96,96, 120,120, 120,120],
+                    num_heads=[6,6,6,6,6,6,6, 6,6, 6,6], pa_frames=2, deformable_groups=16)
         datasets = ['GoPro11-part1', 'GoPro11-part2']
         args.scale = 1
-        args.window_size = [2,8,8]
+        args.window_size = [6,8,8]
         args.nonblind_denoising = False
 
-    elif args.task == '006_RVRT_videodenoising_DAVIS_16frames':
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 4, 6, 8, 4], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], nonblind_denoising=True, cpu_cache_length=100)
+    elif args.task in ['007_VRT_videodeblurring_REDS']:
+        model = net(upscale=1, img_size=[6,192,192], window_size=[6,8,8], depths=[8,8,8,8,8,8,8, 4,4, 4,4],
+                    indep_reconsts=[9,10], embed_dims=[96,96,96,96,96,96,96, 120,120, 120,120],
+                    num_heads=[6,6,6,6,6,6,6, 6,6, 6,6], pa_frames=2, deformable_groups=16)
+        datasets = ['REDS4']
+        args.scale = 1
+        args.window_size = [6,8,8]
+        args.nonblind_denoising = False
+
+    elif args.task == '008_VRT_videodenoising_DAVIS':
+        model = net(upscale=1, img_size=[6,192,192], window_size=[6,8,8], depths=[8,8,8,8,8,8,8, 4,4, 4,4],
+                    indep_reconsts=[9,10], embed_dims=[96,96,96,96,96,96,96, 120,120, 120,120],
+                    num_heads=[6,6,6,6,6,6,6, 6,6, 6,6], pa_frames=2, deformable_groups=16,
+                    nonblind_denoising=True)
         datasets = ['Set8', 'DAVIS-test']
         args.scale = 1
-        args.window_size = [2,8,8]
+        args.window_size = [6,8,8]
         args.nonblind_denoising = True
 
+    elif args.task == '009_VRT_videofi_Vimeo_4frames':
+        model = net(upscale=1, out_chans=3, img_size=[4,192,192], window_size=[4,8,8], depths=[8,8,8,8,8,8,8, 4,4, 4,4],
+                    indep_reconsts=[], embed_dims=[96,96,96,96,96,96,96, 120,120, 120,120],
+                    num_heads=[6,6,6,6,6,6,6, 6,6, 6,6], pa_frames=0)
+        datasets = ['UCF101', 'DAVIS-train']  # 'Vimeo'. Vimeo dataset is too large. Please refer to #training to download it.
+        args.scale = 1
+        args.window_size = [4,8,8]
+        args.nonblind_denoising = False
+
     # download model
-    model_path = f'model_zoo/rvrt/{args.task}.pth'
+    model_path = f'model_zoo/vrt/{args.task}.pth'
     if os.path.exists(model_path):
-        print(f'loading model from ./model_zoo/rvrt/{model_path}')
+        print(f'loading model from ./model_zoo/vrt/{model_path}')
     else:
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        url = 'https://github.com/JingyunLiang/RVRT/releases/download/v0.0/{}'.format(os.path.basename(model_path))
+        url = 'https://github.com/JingyunLiang/VRT/releases/download/v0.0/{}'.format(os.path.basename(model_path))
         r = requests.get(url, allow_redirects=True)
         print(f'downloading model {model_path}')
         open(model_path, 'wb').write(r.content)
@@ -213,7 +253,7 @@ def prepare_model_dataset(args):
         if 'vimeo' in args.folder_lq.lower():
             print(f'Vimeo dataset is not at {args.folder_lq}! Please refer to #training of Readme.md to download it.')
         else:
-            os.makedirs('testsets', exist_ok=True)
+            os.makedirs('../testsets', exist_ok=True)
             for dataset in datasets:
                 url = f'https://github.com/JingyunLiang/VRT/releases/download/v0.0/testset_{dataset}.tar.gz'
                 r = requests.get(url, allow_redirects=True)

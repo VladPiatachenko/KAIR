@@ -78,7 +78,7 @@ def main():
 
 
 
-    srmd_pca_path = os.path.join('kernels', 'srmd_pca_matlab.mat')
+    srmd_pca_path = os.path.join('../kernels', 'srmd_pca_matlab.mat')
     task_current = 'sr'       # 'dn' for denoising | 'sr' for super-resolution
     n_channels = 3            # fixed
     in_nc = 18 if 'nf' in model_name else 19
