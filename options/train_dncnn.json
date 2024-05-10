@@ -74,8 +74,8 @@
     , "G_regularizer_orthstep": null    // unused
     , "G_regularizer_clipstep": null    // unused
 
-    , "checkpoint_test": 100           // for testing
-    , "checkpoint_save": 5           // for saving model
-    , "checkpoint_print": 300           // for print
+    , "checkpoint_test": 2000           // for testing
+    , "checkpoint_save": 1000           // for saving model
+    , "checkpoint_print": 100           // for print
   }
 }

@@ -16,16 +16,24 @@ from utils import utils_option as option
 from data.select_dataset import define_Dataset
 from models.select_model import define_Model
 
-def main(json_path='options/train_dncnn.json'):
+def main(json_path='options/train_dncnn.json', checkpoint=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, default=json_path, help='Path to option JSON file.')
-    opt = option.parse(parser.parse_args().opt, is_train=True)
+    parser.add_argument('-checkpoint', type=str, default=checkpoint, help='Checkpoint file to start training from.')
+    args = parser.parse_args()
+
+    opt = option.parse(args.opt, is_train=True)
     util.mkdirs((path for key, path in opt['path'].items() if 'pretrained' not in key))
 
-    # Update opt
-    init_iter, init_path_G = option.find_last_checkpoint(opt['path']['models'], net_type='G')
-    opt['path']['pretrained_netG'] = init_path_G
-    current_step = init_iter
+    if args.checkpoint:
+        checkpoint_name = args.checkpoint.split('.')[0]
+        load_path_G = os.path.join(opt['path']['models'], f"{checkpoint_name}_g.pth")
+        current_step = int(''.join(filter(str.isdigit, checkpoint_name))) + 1
+    else:
+        # Update opt
+        init_iter, init_path_G = option.find_last_checkpoint(opt['path']['models'], net_type='G')
+        opt['path']['pretrained_netG'] = init_path_G
+        current_step = init_iter
 
     option.save(opt)
 
