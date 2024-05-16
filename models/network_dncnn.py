@@ -126,7 +126,7 @@ class IRCNN(nn.Module):
 # may need more training time, but will not reduce the final PSNR too much.
 # --------------------------------------------
 class FDnCNN(nn.Module):
-    def __init__(self, in_nc=3, out_nc=1, nc=64, nb=20, act_mode='R'):
+    def __init__(self, in_nc=3, out_nc=3, nc=64, nb=20, act_mode='R'):
         """
         in_nc: channel number of input
         out_nc: channel number of output
